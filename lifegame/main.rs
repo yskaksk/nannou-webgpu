@@ -2,12 +2,12 @@ use nannou::prelude::*;
 use nannou::rand::{
     self,
     distributions::{Distribution, Uniform},
-    SeedableRng
+    SeedableRng,
 };
 use std::sync::{Arc, Mutex};
 
-const CELLS_PER_ROW : usize = 250;
-const CELLS_COUNT : usize = CELLS_PER_ROW * CELLS_PER_ROW;
+const CELLS_PER_ROW: usize = 250;
+const CELLS_COUNT: usize = CELLS_PER_ROW * CELLS_PER_ROW;
 const CELLS_PER_GROUP: u32 = 64;
 
 struct Model {
@@ -19,7 +19,7 @@ struct Model {
 struct Compute {
     buffers: Vec<wgpu::Buffer>,
     bind_groups: Vec<wgpu::BindGroup>,
-    pipeline: wgpu::ComputePipeline
+    pipeline: wgpu::ComputePipeline,
 }
 
 fn main() {
@@ -27,7 +27,13 @@ fn main() {
 }
 
 fn model(app: &App) -> Model {
-    let w_id = app.new_window().size(1200, 1200).title("lifegame").view(view).build().unwrap();
+    let w_id = app
+        .new_window()
+        .size(1200, 1200)
+        .title("lifegame")
+        .view(view)
+        .build()
+        .unwrap();
     let window = app.window(w_id).unwrap();
     let device = window.device();
 
@@ -37,15 +43,17 @@ fn model(app: &App) -> Model {
     let cells = create_initial_cells();
     let mut buffers = Vec::<wgpu::Buffer>::new();
     for i in 0..2 {
-        buffers.push(device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some(&format!("cell buffer {}", i)),
-            contents: bytemuck::cast_slice(&cells),
-            usage: wgpu::BufferUsages::VERTEX
-                | wgpu::BufferUsages::STORAGE
-                | wgpu::BufferUsages::COPY_SRC
-                | wgpu::BufferUsages::COPY_DST
-                | wgpu::BufferUsages::MAP_READ,
-        }));
+        buffers.push(
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("cell buffer {}", i)),
+                contents: bytemuck::cast_slice(&cells),
+                usage: wgpu::BufferUsages::VERTEX
+                    | wgpu::BufferUsages::STORAGE
+                    | wgpu::BufferUsages::COPY_SRC
+                    | wgpu::BufferUsages::COPY_DST
+                    | wgpu::BufferUsages::MAP_READ,
+            }),
+        );
     }
     let bind_group_layout = create_bind_group_layout(&device);
     let pipeline_layout = create_pipeline_layout(&device, &bind_group_layout);
@@ -61,7 +69,7 @@ fn model(app: &App) -> Model {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: buffers[(i+1)%2].as_entire_binding(),
+                    resource: buffers[(i + 1) % 2].as_entire_binding(),
                 },
             ],
             label: None,
@@ -70,13 +78,13 @@ fn model(app: &App) -> Model {
     let compute = Compute {
         buffers,
         bind_groups,
-        pipeline
+        pipeline,
     };
 
     Model {
         compute,
         cells: Arc::new(Mutex::new(vec![0 as u32; CELLS_COUNT as usize])),
-        fc: 0
+        fc: 0,
     }
 }
 
@@ -91,7 +99,7 @@ fn update(app: &App, model: &mut Model, _: Update) {
         label: Some("output buffer"),
         size: buffer_size,
         usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false
+        mapped_at_creation: false,
     });
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
         label: Some("compute"),
@@ -102,9 +110,19 @@ fn update(app: &App, model: &mut Model, _: Update) {
         });
         compute_pass.set_pipeline(&compute.pipeline);
         compute_pass.set_bind_group(0, &compute.bind_groups[fc % 2], &[]);
-        compute_pass.dispatch(((CELLS_COUNT as f32) / (CELLS_PER_GROUP as f32)).ceil() as u32, 1, 1);
+        compute_pass.dispatch(
+            ((CELLS_COUNT as f32) / (CELLS_PER_GROUP as f32)).ceil() as u32,
+            1,
+            1,
+        );
     }
-    encoder.copy_buffer_to_buffer(&compute.buffers[(fc + 1) % 2], 0, &output_buffer, 0, buffer_size);
+    encoder.copy_buffer_to_buffer(
+        &compute.buffers[(fc + 1) % 2],
+        0,
+        &output_buffer,
+        0,
+        buffer_size,
+    );
     window.queue().submit(Some(encoder.finish()));
 
     let cells = Arc::clone(&model.cells);
@@ -143,7 +161,10 @@ fn view(app: &App, model: &Model, frame: Frame) {
                 let y = map_range(yi, 0.0, 1.0, rect.bottom(), rect.top());
                 draw.rect()
                     .x_y(x, y)
-                    .w_h(rect.w() / (CELLS_PER_ROW as f32), rect.h() / (CELLS_PER_ROW as f32))
+                    .w_h(
+                        rect.w() / (CELLS_PER_ROW as f32),
+                        rect.h() / (CELLS_PER_ROW as f32),
+                    )
                     .rgb(0.0, 0.0, 0.0);
             }
         }
@@ -156,11 +177,11 @@ fn index_to_loc(index: usize) -> (f32, f32) {
     let yi = index / CELLS_PER_ROW;
     let x = (1.0 / (2.0 * CELLS_PER_ROW as f32)) + (xi as f32) / (CELLS_PER_ROW as f32);
     let y = (1.0 / (2.0 * CELLS_PER_ROW as f32)) + (yi as f32) / (CELLS_PER_ROW as f32);
-    return (x, y)
+    return (x, y);
 }
 
 fn create_initial_cells() -> Vec<u32> {
-    let mut cells : Vec<u32> = vec![0; CELLS_COUNT];
+    let mut cells: Vec<u32> = vec![0; CELLS_COUNT];
     let mut rng = rand::rngs::StdRng::seed_from_u64(123);
     let unif = Uniform::new_inclusive::<f32, f32>(0.0, 1.0);
     for i in 0..CELLS_COUNT {
@@ -168,11 +189,11 @@ fn create_initial_cells() -> Vec<u32> {
             cells[i] = 1;
         }
     }
-    return cells
+    return cells;
 }
 
 fn create_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-   return device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+    return device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         entries: &[
             wgpu::BindGroupLayoutEntry {
                 binding: 0,
@@ -195,7 +216,7 @@ fn create_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
                 count: None,
             },
         ],
-        label: None
+        label: None,
     });
 }
 
